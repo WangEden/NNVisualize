@@ -10,6 +10,7 @@
 </head>
 <body>
 <canvas id="cnnCanvas" width="780" height="240"></canvas>
+<canvas id="cnnCanvas2" width="780" height="240"></canvas>
 <script>
   const canvas = document.getElementById('cnnCanvas');
   const ctx = canvas.getContext('2d');
@@ -212,6 +213,77 @@
     link.click();
   };
   document.body.appendChild(saveBtn);
+
+  
+</script>
+<script>
+  // 第二个画布
+  const canvas2 = document.getElementById('cnnCanvas2');
+  const ctx2 = canvas2.getContext('2d');
+
+  // 绘制连线
+  function drawConnector(fromX, fromY, toX, toY) {
+    ctx2.save();
+    ctx2.strokeStyle = dashColor;
+    ctx2.setLineDash([5, 5]);
+    ctx2.beginPath();
+    ctx2.moveTo(fromX, fromY);
+    ctx2.lineTo(toX, toY);
+    ctx2.stroke();
+    ctx2.setLineDash([]);
+    ctx2.fillStyle = dashColor;
+    ctx2.fill();
+    ctx2.restore;
+  }
+
+  // 创建全连接层的上面两个圆圈
+  const c2fcP1 = { x: 50, y: 50, count: 2, space: 35, r: 12 };
+  ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
+  // ctx2.fillText('全连接层', c2fcP1.x, c2fcP1.y - 20);
+  for (let i = 0; i < c2fcP1.count; i++) {
+    ctx2.beginPath();
+    ctx2.fillStyle = 'rgba(128,222,233,0.8)';
+    ctx2.strokeStyle = 'purple';
+    ctx2.lineWidth = 1;
+    ctx2.arc(c2fcP1.x, c2fcP1.y + i * c2fcP1.space, c2fcP1.r, 0, 2 * Math.PI);
+    ctx2.fill(); ctx2.stroke();
+    // 根据序号在圆圈中心添加文字
+    ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
+    ctx2.fillText('x' + (i + 1), c2fcP1.x - 6, c2fcP1.y + i * c2fcP1.space + 5);
+  }
+
+  // 在正下方绘制三个竖着排列的小圆圈
+  const smallCircleCount = 3;
+  const smallCircleRadius = 1;
+  const smallCircleSpace = 5;
+  const smallCircleX = c2fcP1.x;
+  const smallCircleY = c2fcP1.y + (c2fcP1.count) * c2fcP1.space - 10;
+  for (let i = 0; i < smallCircleCount; i++) {
+    ctx2.beginPath();
+    ctx2.fillStyle = '#000';
+    ctx2.strokeStyle = '#000';
+    ctx2.lineWidth = 1;
+    ctx2.arc(smallCircleX, smallCircleY + i * smallCircleSpace, smallCircleRadius, 0, 2 * Math.PI);
+    ctx2.fill(); ctx2.stroke();
+  }
+
+  // 再绘制一遍两个圆圈
+  const c2fcP2 = { x: 50, y: 145, count: 2, space: 35, r: 12 };
+  ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
+  // ctx2.fillText('全连接层', c2fcP2.x, c2fcP2.y - 20);
+  for (let i = 0; i < c2fcP2.count; i++) {
+    ctx2.beginPath();
+    ctx2.fillStyle = 'rgba(128,222,233,0.8)';
+    ctx2.strokeStyle = 'purple';
+    ctx2.lineWidth = 1;
+    ctx2.arc(c2fcP2.x, c2fcP2.y + i * c2fcP2.space, c2fcP2.r, 0, 2 * Math.PI);
+    ctx2.fill(); ctx2.stroke();
+    // 根据序号在圆圈中心添加文字
+    ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
+    ctx2.fillText('x' + (i + 3), c2fcP2.x - 6, c2fcP2.y + i * c2fcP2.space + 5);
+  }
+
+
 </script>
 </body>
 </html>
