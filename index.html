@@ -13,6 +13,14 @@
 <canvas id="cnnCanvas2" width="780" height="240"></canvas>
 <canvas id="cnnCanvas3" width="780" height="240"></canvas>
 <canvas id="cnnCanvas4" width="780" height="240"></canvas>
+<canvas id="cnnCanvas5" width="780" height="250"></canvas>
+<canvas id="cnnCanvas6" width="780" height="250"></canvas>
+<canvas id="cnnCanvas7" width="780" height="250"></canvas>
+<canvas id="cnnCanvas8" width="780" height="300"></canvas>
+<canvas id="cnnCanvas9" width="780" height="250"></canvas>
+<canvas id="cnnCanvas10" width="780" height="250"></canvas>
+<canvas id="cnnCanvas11" width="780" height="250"></canvas>
+
 <script> // 全局变量和可调用API
   // 样式参数
   const fm1Color = 'rgba(0,100,255,0.2)';
@@ -34,6 +42,17 @@
     ctx.setLineDash([]);
     ctx.fillStyle = dashColor;
     ctx.fill();
+    ctx.restore();
+  }
+
+  function drawConnectorReal(ctx, fromX, fromY, toX, toY) {
+    ctx.save();
+    ctx.strokeStyle = '#000';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -99,9 +118,9 @@
     }
   }
 
-  // 绘制带箭头的连线
   /**
-   * 绘制带箭头的连接线
+   * 绘制带箭头的连接线，并在终点右侧添加文字
+   * @param {CanvasRenderingContext2D} ctx canvas 上下文
    * @param {number} fromX 起点 x 坐标
    * @param {number} fromY 起点 y 坐标
    * @param {number} toX   终点 x 坐标
@@ -109,8 +128,11 @@
    * @param {string} color 线条颜色
    * @param {number} width 线宽
    * @param {boolean} dashed 是否为虚线
+   * @param {string} label 文字内容（可选）
+   * @param {string} font 字体设置（默认 '12px sans-serif'）
+   * @param {string} labelposition
    */
-  function drawConnectorWithArrow(ctx, fromX, fromY, toX, toY, color = '#333', width = 2, dashed = false) {
+  function drawConnectorWithArrow(ctx, fromX, fromY, toX, toY, color = '#333', width = 2, dashed = false, label = '', font = '12px sans-serif', labelposition = "right") {
     const headlen = 10; // 箭头长度
     const angle = Math.atan2(toY - fromY, toX - fromX);
 
@@ -118,7 +140,6 @@
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = width;
-
     if (dashed) ctx.setLineDash([5, 5]);
 
     // 主线
@@ -142,12 +163,170 @@
     ctx.closePath();
     ctx.fill();
 
-    if (dashed) ctx.setLineDash([]); // 清除虚线样式
+    // 清除虚线设置
+    if (dashed) ctx.setLineDash([]);
+
+    // 添加文字（在终点右侧偏移位置）
+    // 添加文字（根据 labelPosition 定位）
+    if (label) {
+      const offset = 8;
+      ctx.font = font;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      if (labelPosition === 'right') {
+        ctx.textAlign = 'center';
+        let labelX = toX + offset;
+        let labelY = toY;
+        if (fromY < toY) {
+          labelY -= offset;
+        } else if (fromY > toY) {
+          labelY += offset;
+        } else {
+          labelY = fromY;
+        }
+        ctx.fillText(label, labelX, labelY);
+      } else if (labelPosition === 'top') {
+        ctx.textAlign = 'center';
+        let labelX = (fromX + toX) / 2;
+        let labelY = fromY;
+        if (fromY < toY) {
+          labelY += offset;
+        } else if (fromY > toY) {
+          labelY -= offset;
+        } else {
+          labelY = fromY;
+        }
+        ctx.fillText(label, labelX, labelY);
+      } else if (labelPosition === 'bottom') {
+        ctx.textAlign = 'center';
+        let labelX = (fromX + toX) / 2;
+        let labelY = fromY;
+        if (fromY < toY) {
+          labelY -= offset;
+        } else if (fromY > toY) {
+          labelY += offset;
+        } else {
+          labelY = fromY;
+        }
+        ctx.fillText(label, labelX, labelY);
+      }
+
+    }
+
+    ctx.restore();
+  }
+
+  // 绘制一系列纵向排列的圆圈
+  /**
+   * 垂直绘制一组圆圈
+   * @param {CanvasRenderingContext2D} ctx  Canvas 上下文
+   * @param {number} startX      起始 x 坐标
+   * @param {number} startY      起始 y 坐标
+   * @param {number} radius      圆半径
+   * @param {number} count       圆的个数
+   * @param {number} spacing     圆心之间的垂直间距
+   * @param {string} fillColor   填充色
+   * @param {string} strokeColor 边框色
+   */
+  function drawVerticalCircles(ctx, startX, startY, radius, count, spacing, fillColor = '#88c', strokeColor = '#333') {
+    ctx.save();
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < count; i++) {
+      const y = startY + i * spacing;
+      ctx.beginPath();
+      ctx.arc(startX, y, radius, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * 将两组点之间按全连接方式绘制线条
+   * @param {CanvasRenderingContext2D} ctx canvas 上下文
+   * @param {[number, number][]} fromPoints 起点坐标组（如 [[x1,y1], [x2,y2], ...]）
+   * @param {[number, number][]} toPoints   终点坐标组（如 [[x1,y1], [x2,y2], ...]）
+   * @param {function} connectorFn 使用的连接函数（如 drawConnector）
+   */
+  function drawFullConnection(ctx, fromPoints, toPoints, connectorFn) {
+    for (const [fx, fy] of fromPoints) {
+      for (const [tx, ty] of toPoints) {
+        connectorFn(ctx, fx, fy, tx, ty);
+      }
+    }
+  }
+
+  /**
+   * 绘制一个带圆角矩形，并在其中心添加文字，在左侧显示编号
+   * @param {CanvasRenderingContext2D} ctx     canvas 上下文
+   * @param {number} x                         左上角 x 坐标
+   * @param {number} y                         左上角 y 坐标
+   * @param {number} width                     矩形宽度
+   * @param {number} height                    矩形高度
+   * @param {string} text                      中心显示文字
+   * @param {string|number} number             左侧编号文本（如“1”）
+   * @param {string} fillColor                 矩形填充色
+   * @param {string} strokeColor               矩形边框色
+   * @param {number} radius                    圆角半径（默认 10）
+   * @param {string} font                      主文字字体（默认 '14px sans-serif'）
+   * @param {string} numberFont                编号字体（默认 '12px sans-serif'）
+   * @param {string} numberBgColor             编号背景色（默认 '#fff'）
+   */
+  function drawLabeledRoundedRectWithNumber(ctx, x, y, width, height, text, number, fillColor = '#eef', strokeColor = '#333', radius = 10, font = '14px sans-serif', numberFont = '12px sans-serif', numberBgColor = '#fff') {
+    ctx.save();
+    // 编号圆参数
+    const circleRadius = 12;
+    const circleCenterX = x - circleRadius - 6;
+    const circleCenterY = y + height / 2;
+    // 绘制左侧编号圆圈
+    if (number) {
+      ctx.beginPath();
+      ctx.arc(circleCenterX, circleCenterY, circleRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = numberBgColor;
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.stroke();
+      // 编号文字
+      ctx.font = numberFont;
+      ctx.fillStyle = '#000';
+      ctx.textAlign = 'center';
+    }
+    ctx.textBaseline = 'middle';
+    ctx.fillText(number, circleCenterX, circleCenterY);
+    // 绘制圆角矩形
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    // 填充和描边
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.stroke();
+    // 主体文字
+    ctx.font = font;
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + width / 2, y + height / 2);
     ctx.restore();
   }
 
 </script>
-<script>
+<script> // 第一个画布
   const canvas = document.getElementById('cnnCanvas');
   const ctx1 = canvas.getContext('2d');
 
@@ -295,7 +474,7 @@
 
   // 创建按钮保存以上绘制的图像
   const saveBtn = document.createElement('button');
-  saveBtn.innerText = '保存图像';
+  saveBtn.innerText = '保存图像1';
   saveBtn.style.position = 'absolute';
   saveBtn.style.top = '10px';
   saveBtn.style.right = '10px';
@@ -307,61 +486,54 @@
   };
   document.body.appendChild(saveBtn);
 </script>
-<script>
-  // 第二个画布
+<script> // 第二个画布
   const canvas2 = document.getElementById('cnnCanvas2');
   const ctx2 = canvas2.getContext('2d');
 
-  // 创建全连接层的上面两个圆圈
-  const c2fcP1 = { x: 50, y: 50, count: 2, space: 35, r: 12 };
-  ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
-  // ctx2.fillText('全连接层', c2fcP1.x, c2fcP1.y - 20);
-  for (let i = 0; i < c2fcP1.count; i++) {
-    ctx2.beginPath();
-    ctx2.fillStyle = 'rgba(128,222,233,0.8)';
-    ctx2.strokeStyle = 'purple';
-    ctx2.lineWidth = 1;
-    ctx2.arc(c2fcP1.x, c2fcP1.y + i * c2fcP1.space, c2fcP1.r, 0, 2 * Math.PI);
-    ctx2.fill(); ctx2.stroke();
-    // 根据序号在圆圈中心添加文字
-    ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
-    ctx2.fillText('x' + (i + 1), c2fcP1.x - 6, c2fcP1.y + i * c2fcP1.space + 5);
+  // 绘制第一列圆圈 6
+  // 半透明紫色
+  drawVerticalCircles(ctx2, 50, 32, 12, 6, 35, "rgba(128,222,233,0.8)");
+  // 根据第一列圆圈生成一组每个圆圈右边的坐标点
+  pos1 = [];
+  for (let i = 0; i < 6; i++) {
+    pos1.push([65, 32 + i * 35]);
   }
-
-  // 在正下方绘制三个竖着排列的小圆圈
-  const smallCircleCount = 3;
-  const smallCircleRadius = 1;
-  const smallCircleSpace = 5;
-  const smallCircleX = c2fcP1.x;
-  const smallCircleY = c2fcP1.y + (c2fcP1.count) * c2fcP1.space - 10;
-  for (let i = 0; i < smallCircleCount; i++) {
-    ctx2.beginPath();
-    ctx2.fillStyle = '#000';
-    ctx2.strokeStyle = '#000';
-    ctx2.lineWidth = 1;
-    ctx2.arc(smallCircleX, smallCircleY + i * smallCircleSpace, smallCircleRadius, 0, 2 * Math.PI);
-    ctx2.fill(); ctx2.stroke();
+  // 绘制第二列圆圈 4
+  // 半透明绿色
+  drawVerticalCircles(ctx2, 150, 32 + 35, 12, 4, 35, "rgba(144,238,144,0.8)");
+  // 根据第二列圆圈生成一组每个圆圈左边的坐标点
+  pos2 = [];
+  for (let i = 0; i < 4; i++) {
+    pos2.push([150 - 12, 32 + 35 + i * 35]);
   }
-
-  // 再绘制一遍两个圆圈
-  const c2fcP2 = { x: 50, y: 145, count: 2, space: 35, r: 12 };
-  ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
-  // ctx2.fillText('全连接层', c2fcP2.x, c2fcP2.y - 20);
-  for (let i = 0; i < c2fcP2.count; i++) {
-    ctx2.beginPath();
-    ctx2.fillStyle = 'rgba(128,222,233,0.8)';
-    ctx2.strokeStyle = 'purple';
-    ctx2.lineWidth = 1;
-    ctx2.arc(c2fcP2.x, c2fcP2.y + i * c2fcP2.space, c2fcP2.r, 0, 2 * Math.PI);
-    ctx2.fill(); ctx2.stroke();
-    // 根据序号在圆圈中心添加文字
-    ctx2.fillStyle = '#222'; ctx2.font = '14px sans-serif';
-    ctx2.fillText('x' + (i + 3), c2fcP2.x - 6, c2fcP2.y + i * c2fcP2.space + 5);
+  // 调用函数绘制全连接
+  drawFullConnection(ctx2, pos1, pos2, drawConnector);
+  // 创建第三列圆圈 2
+  drawVerticalCircles(ctx2, 250, 32 + 35 * 2, 12, 2, 35);
+  pos3 = []
+  for (let i = 0; i < 4; i++) {
+    pos3.push([150 + 12, 32 + 35 + i * 35]);
   }
-
+  pos4 = []
+  for (let i = 0; i < 2; i++) {
+    pos4.push([250 - 12, 32 + 35 * 2 + i * 35]);
+  }
+  drawFullConnection(ctx2, pos3, pos4, drawConnector);
+  // 创建按钮保存画布2
+  const saveBtn2 = document.createElement('button');
+  saveBtn2.innerText = '保存图像2';
+  saveBtn2.style.position = 'absolute';
+  saveBtn2.style.top = '40px';
+  saveBtn2.style.right = '10px';
+  document.body.appendChild(saveBtn2);
+  saveBtn2.onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'cnn_structure2.png';
+      link.href = canvas2.toDataURL();
+      link.click();
+    };
 </script>
-<script>
-  // 第三个画布
+<script> // 第三个画布
   const canvas3 = document.getElementById('cnnCanvas3');
   const ctx3 = canvas3.getContext('2d');
 
@@ -467,7 +639,7 @@ drawConnectorWithArrow(ctx3, arrowStartX, arrowStartY, arrowEndX, arrowEndY);
 const saveBtn3 = document.createElement('button');
 saveBtn3.innerText = '保存图像3';
 saveBtn3.style.position = 'absolute';
-saveBtn3.style.top = '60px';
+saveBtn3.style.top = '70px';
 saveBtn3.style.right = '10px';
 document.body.appendChild(saveBtn3);
 saveBtn3.onclick = function() {
@@ -477,8 +649,7 @@ saveBtn3.onclick = function() {
     link.click();
   };
 </script>
-<script>
-  // 第四个画布
+<script> // 第四个画布
   const canvas4 = document.getElementById('cnnCanvas4');
   const ctx4 = canvas4.getContext('2d');
 
@@ -565,7 +736,7 @@ saveBtn3.onclick = function() {
   const saveBtn4 = document.createElement('button');
   saveBtn4.innerText = '保存图像4';
   saveBtn4.style.position = 'absolute';
-  saveBtn4.style.top = '90px';
+  saveBtn4.style.top = '100px';
   saveBtn4.style.right = '10px';
   document.body.appendChild(saveBtn4);
   saveBtn4.onclick = function() {
@@ -575,5 +746,277 @@ saveBtn3.onclick = function() {
       link.click();
     };
 </script>
+<script> // 第五个画布
+  const canvas5 = document.getElementById('cnnCanvas5');
+  const ctx5 = canvas5.getContext('2d');
+  drawConnectorWithArrow(ctx5, 40 + 30, 215 + 30, 40 + 30, 215, "rgba(0,0,0,1)", 2, false, "640x640x3", "12px sans-serif", labelPosition="right");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 40, 215 - 30, 60, 30, "Conv", "0", "rgba(133, 237, 255, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 40 + 30, 215 - 30, 40 + 30, 215 - 30 * 2, "rgba(0,0,0,1)", 2, false, "320x320x64", "12px sans-serif", labelPosition="right");
+  
+  drawLabeledRoundedRectWithNumber(ctx5, 40, 215 - 30 * 3, 60, 30, "Conv", 1, "rgba(133, 237, 255, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 40 + 30, 215 - 30 * 3, 40 + 30, 215 - 30 * 4, "rgba(0,0,0,1)", 2, false, "160x160x128", "12px sans-serif", labelPosition="right");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 40, 215 - 30 * 5, 60, 30, "C2f", 2, "rgba(199, 255, 231, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 40 + 30, 215 - 30 * 5, 40 + 30, 215 - 30 * 6, "rgba(0,0,0,1)", 2, false, "160x160x128", "12px sans-serif", labelPosition="right");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 40, 215 - 30 * 7, 60, 30, "Conv", 3, "rgba(133, 237, 255, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 40 + 60, 215 - 30 * 7 + 30 / 2, 40 + 60 + 60 + 60, 215 - 30 * 7 + 30 / 2, "rgba(0,0,0,1)", 2, false, "80x80x256", "12px sans-serif", labelPosition="top");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 255, 215 - 30 * 7, 60, 30, "C2f", 4, "rgba(199, 255, 231, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 255 + 30, 215 - 30 * 6, 255 + 30, 215 - 30 * 5, "rgba(0,0,0,1)", 2, false, "80x80x256", "12px sans-serif", labelPosition="right");
+  drawConnectorWithArrow(ctx5, 255 + 60, 215 - 30 * 7 + 30 / 2, 255 + 60 + 60 + 40, 215 - 30 * 7 + 30 / 2, "rgba(0,0,0,1)", 2, false, "P3 80x80x256", "12px sans-serif", labelPosition="top");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 255, 215 - 30 * 5, 60, 30, "Conv", 5, "rgba(133, 237, 255, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 255 + 30, 215 - 30 * 4, 255 + 30, 215 - 30 * 3, "rgba(0,0,0,1)", 2, false, "40x40x512", "12px sans-serif", labelPosition="right");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 255, 215 - 30 * 3, 60, 30, "C2f", 6, "rgba(199, 255, 231, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 255 + 30, 215 - 30 * 2, 255 + 30, 215 - 30 * 1, "rgba(0,0,0,1)", 2, false, "40x40x512", "12px sans-serif", labelPosition="right");
+  drawConnectorWithArrow(ctx5, 255 + 60, 215 - 30 * 3 + 30 / 2, 255 + 60 + 60 + 40, 215 - 30 * 3 + 30 / 2, "rgba(0,0,0,1)", 2, false, "P4 40x40x512", "12px sans-serif", labelPosition="top");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 255, 215 - 30 * 1, 60, 30, "Conv", 7, "rgba(133, 237, 255, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 255 + 60, 215 - 30 * 1 + 30 / 2, 255 + 60 + 60 + 60, 215 - 30 * 1 + 30 / 2, "rgba(0,0,0,1)", 2, false, "20x20x1024", "12px sans-serif", labelPosition="top");
+
+  drawLabeledRoundedRectWithNumber(ctx5, 470, 215 - 30 * 1, 60, 30, "C2f", 8, "rgba(199, 255, 231, 0.4)", radius=4);
+  drawConnectorWithArrow(ctx5, 470 + 30, 215 - 30 * 1, 470 + 30, 215 - 30 * 4, "rgba(0,0,0,1)", 2, false, "20x20x1024", "12px sans-serif", labelPosition="right");
+  
+  drawLabeledRoundedRectWithNumber(ctx5, 470, 215 - 30 * 5, 60, 30, "SPPF", 9, "rgba(255, 173, 213, 0.7)", radius=4);
+  drawConnectorWithArrow(ctx5, 470 + 60, 215 - 30 * 5 + 30 / 2, 470 + 60 + 60 + 40, 215 - 30 * 5 + 30 / 2, "rgba(0,0,0,1)", 2, false, "P5 20x20x1024", "12px sans-serif", labelPosition="top");
+
+  // 创建一个按钮保存画布5
+  const saveBtn5 = document.createElement('button');
+  saveBtn5.innerText = '保存图像5';
+  saveBtn5.style.position = 'absolute';
+  saveBtn5.style.top = '130px';
+  saveBtn5.style.right = '10px';
+  document.body.appendChild(saveBtn5);
+  saveBtn5.onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'cnn_structure5.png';
+      link.href = canvas5.toDataURL();
+      link.click();
+    };
+</script>
+<script> // 第六个画布 ConvModule内部
+  const canvas6 = document.getElementById('cnnCanvas6');
+  const ctx6 = canvas6.getContext('2d');
+
+  // Conv2d
+  drawConnectorWithArrow(ctx6, 100, 5, 100, 210 - 60 * 3, "rgba(0,0,0,1)", 2, false, "", "12px sans-serif", "right");
+  drawLabeledRoundedRectWithNumber(ctx6, 100 - 50, 210 - 60 * 3, 100, 60, "Conv2d", "", "rgba(133, 237, 255, 0.4)", 4);
+
+  // BatchNorm2d
+  drawConnectorWithArrow(ctx6, 100, 210 - 60 * 3 + 60, 100, 210 - 30 * 3, "rgba(0,0,0,1)", 2, false, "", "12px sans-serif", "right");
+  drawLabeledRoundedRectWithNumber(ctx6, 80 - 40, 210 - 30 * 3, 120, 40, "BatchNorm2d", "", "rgba(199, 255, 231, 0.4)", 4);
+
+  // SiLU
+  drawConnectorWithArrow(ctx6, 100, 210 - 30 * 2 + 10, 100, 210 - 30 * 1 + 10, "rgba(0,0,0,1)", 2, false, "", "12px sans-serif", "right");
+  drawLabeledRoundedRectWithNumber(ctx6, 90 - 30, 210 - 30 * 1 + 10, 80, 30, "SiLU", "", "rgba(255, 239, 199, 0.6)", 4);
+
+  drawConnectorWithArrow(ctx6, 100, 210 + 10, 100, 210 + 35, "rgba(0,0,0,1)", 2, false, "", "12px sans-serif", "right");
+
+  drawLabeledRoundedRectWithNumber(ctx6, 20, 15, 160, 215, "", "", "rgba(255,255,255,0)", 4);
+
+  // 创建一个按钮保存画布6
+  const saveBtn6 = document.createElement('button');
+  saveBtn6.innerText = '保存图像6';
+  saveBtn6.style.position = 'absolute';
+  saveBtn6.style.top = '160px';
+  saveBtn6.style.right = '10px';
+  document.body.appendChild(saveBtn6);
+  saveBtn6.onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'cnn_structure6.png';
+      link.href = canvas6.toDataURL();
+      link.click();
+    };
+</script>
+<script>
+// 第7个画布：绘制 YOLOv8 的 CSPLayer_2Conv 模块结构
+const canvas7 = document.getElementById('cnnCanvas7');
+const ctx7 = canvas7.getContext('2d');
+
+// 基础坐标
+const centerX = 200;
+const startY = 40;
+const boxWidth = 100;
+const boxHeight = 40;
+const spacingY = 50;
+const spacingX = 80;
+
+// 输入 → 分支 Conv1 和 Conv2
+drawLabeledRoundedRectWithNumber(ctx7, centerX - 50, startY, boxWidth, boxHeight, 'Input', '', '#eee', '#999', 6);
+drawConnectorWithArrow(ctx7, centerX, startY + boxHeight, centerX - spacingX, startY + spacingY, '#000', 2, false);
+drawConnectorWithArrow(ctx7, centerX, startY + boxHeight, centerX + spacingX, startY + spacingY, '#000', 2, false);
+
+// Conv1 分支
+drawLabeledRoundedRectWithNumber(ctx7, centerX - spacingX - boxWidth / 2, startY + spacingY, boxWidth, boxHeight, 'Conv1', '', 'rgba(133, 237, 255, 0.4)', '#0060aa', 6);
+
+// Conv2 分支
+drawLabeledRoundedRectWithNumber(ctx7, centerX + spacingX - boxWidth / 2, startY + spacingY, boxWidth, boxHeight, 'Conv2', '', 'rgba(133, 237, 255, 0.4)', '#0060aa', 6);
+
+// 两分支向下合并
+drawConnectorWithArrow(ctx7, centerX - spacingX, startY + spacingY + boxHeight, centerX, startY + spacingY * 2, '#000', 2, false);
+drawConnectorWithArrow(ctx7, centerX + spacingX, startY + spacingY + boxHeight, centerX, startY + spacingY * 2, '#000', 2, false);
+
+// Concat
+drawLabeledRoundedRectWithNumber(ctx7, centerX - boxWidth / 2, startY + spacingY * 2, boxWidth, boxHeight, 'Concat', '', '#ffe', '#666', 6);
+
+// Concat → Conv3
+drawConnectorWithArrow(ctx7, centerX, startY + spacingY * 2 + boxHeight, centerX, startY + spacingY * 3, '#000', 2, false);
+
+// Conv3（融合）
+drawLabeledRoundedRectWithNumber(ctx7, centerX - boxWidth / 2, startY + spacingY * 3, boxWidth, boxHeight, 'Conv3', '', 'rgba(199, 255, 231, 0.4)', '#008800', 6);
+
+// 输出
+drawConnectorWithArrow(ctx7, centerX, startY + spacingY * 3 + boxHeight, centerX, startY + spacingY * 4, '#000', 2, false);
+drawLabeledRoundedRectWithNumber(ctx7, centerX - boxWidth / 2, startY + spacingY * 4, boxWidth, boxHeight, 'Output', '', '#eee', '#999', 6);
+
+// 创建一个按钮保存画布7
+const saveBtn7 = document.createElement('button');
+saveBtn7.innerText = '保存图像7';
+saveBtn7.style.position = 'absolute';
+saveBtn7.style.top = '160px';
+saveBtn7.style.right = '10px';
+document.body.appendChild(saveBtn7);
+saveBtn7.onclick = function() {
+    const link = document.createElement('a');
+    link.download = 'cnn_structure7.png';
+    link.href = canvas7.toDataURL();
+    link.click();
+  };
+</script>
+
+<script> // 第8个画布 Neck
+  const canvas8 = document.getElementById('cnnCanvas8');
+  const ctx8 = canvas8.getContext('2d');
+
+  // 绘制 Neck 结构
+  anchor_y1 = 70;
+  anchor_y2 = 5;
+  drawLabeledRoundedRectWithNumber(ctx8, 40, anchor_y1, 120, 20, 'UpSample', '', 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 40, anchor_y1 + 40, 120, 20, 'Concat', '', 'rgba(255, 239, 199, 0.6)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 40, anchor_y1 + 80, 120, 20, 'CSPLayer_2Conv', '', 'rgba(133, 237, 255, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 40, anchor_y1 + 120, 120, 20, 'UpSample', '', 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 40, anchor_y1 + 160, 120, 20, 'Concat', '', 'rgba(255, 239, 199, 0.6)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 40, anchor_y1 + 200, 120, 20, 'CSPLayer_2Conv', '', 'rgba(133, 237, 255, 0.4)', 4);
+
+  drawLabeledRoundedRectWithNumber(ctx8, 240, anchor_y2, 120, 20, 'CSPLayer_2Conv', '', 'rgba(133, 237, 255, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 240, anchor_y2 + 40, 120, 20, 'Concat', '', 'rgba(255, 239, 199, 0.6)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 240, anchor_y2 + 80, 120, 20, 'ConvModule', '', 'rgba(180, 167, 215, 0.8)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 240, anchor_y2 + 120, 120, 20, 'CSPLayer_2Conv', '', 'rgba(133, 237, 255, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 240, anchor_y2 + 160, 120, 20, 'Concat', '', 'rgba(255, 239, 199, 0.6)', 4);
+  drawLabeledRoundedRectWithNumber(ctx8, 240, anchor_y2 + 200, 120, 20, 'ConvModule', '', 'rgba(180, 167, 215, 0.8)', 4);
+
+  drawConnectorWithArrow(ctx8, 5, anchor_y1 + 170, 40, anchor_y1 + 170, '#000', 2, false, "", "12px sans-serif", "bottom");
+  ctx8.fillStyle = '#000'; ctx8.font = '12px sans-serif';
+  ctx8.fillText('P3', 5, anchor_y1 + 165);
+  drawConnectorWithArrow(ctx8, 5, anchor_y1 + 50, 40, anchor_y1 + 50, '#000', 2, false, "", "12px sans-serif", "bottom");
+  ctx8.fillText('P4', 5, anchor_y1 + 45);
+  drawConnectorWithArrow(ctx8, 5, anchor_y2 + 50, 240, anchor_y2 + 50, '#000', 2, false, "", "12px sans-serif", "bottom");
+  ctx8.fillText('P5 20x20x1024', 5, anchor_y2 + 45);
+  
+  drawConnectorWithArrow(ctx8, 100, anchor_y2 + 50, 100, anchor_y2 + 65, '#000', 2, false, "                                   20x20x1024", "12px sans-serif", "right");
+  drawConnectorWithArrow(ctx8, 100, anchor_y2 + 85, 100, anchor_y2 + 105, '#000', 2, false, "                                   40x40x1024", "12px sans-serif", "right");
+  drawConnectorWithArrow(ctx8, 100, anchor_y2 + 125, 100, anchor_y2 + 145, '#000', 2, false, "                                   40x40x1536", "12px sans-serif", "right");
+  drawConnectorWithArrow(ctx8, 100, anchor_y2 + 165, 100, anchor_y2 + 185, '#000', 2, false, "                                   40x40x512", "12px sans-serif", "right");
+  drawConnectorWithArrow(ctx8, 100, anchor_y2 + 205, 100, anchor_y2 + 225, '#000', 2, false, "                                   80x80x512", "12px sans-serif", "right");
+  drawConnectorWithArrow(ctx8, 100, anchor_y2 + 245, 100, anchor_y2 + 265, '#000', 2, false, "                                   80x80x768", "12px sans-serif", "right");
+
+  drawConnectorWithArrow(ctx8, 160, anchor_y2 + 275, 420, anchor_y2 + 275, '#000', 2, false, "", "12px sans-serif", "top");
+  ctx8.fillText('P3 80x80x256', 380, anchor_y2 + 270);
+
+  drawConnectorWithArrow(ctx8, 300, anchor_y2 + 275, 300, anchor_y2 + 220, '#000', 2, false, "                          80x80x256", "12px sans-serif", "top");
+  drawConnectorWithArrow(ctx8, 300, anchor_y2 + 200, 300, anchor_y2 + 180, '#000', 2, false, "                          40x40x256", "12px sans-serif", "top");
+  drawConnectorWithArrow(ctx8, 300, anchor_y2 + 160, 300, anchor_y2 + 140, '#000', 2, false, "                          40x40x768", "12px sans-serif", "top");
+  drawConnectorWithArrow(ctx8, 300, anchor_y2 + 120, 300, anchor_y2 + 100, '#000', 2, false, "                          40x40x512", "12px sans-serif", "top");
+  drawConnectorWithArrow(ctx8, 300, anchor_y2 + 80, 300, anchor_y2 + 60, '#000', 2, false, "                           20x20x512", "12px sans-serif", "top");
+  drawConnectorWithArrow(ctx8, 300, anchor_y2 + 40, 300, anchor_y2 + 20, '#000', 2, false, "                             20x20x1536", "12px sans-serif", "top");
+
+  drawConnectorWithArrow(ctx8, 360, anchor_y2 + 10, 420, anchor_y2 + 10, '#000', 2, false, "", "12px sans-serif", "top");
+  ctx8.fillText('P3 20x20x1024', 380, anchor_y2 + 5);
+  drawConnectorWithArrow(ctx8, 360, anchor_y2 + 130, 420, anchor_y2 + 130, '#000', 2, false, "", "12px sans-serif", "top");
+  ctx8.fillText('P4 40x40x512', 380, anchor_y2 + 125);
+  // 创建一个按钮保存画布8
+  const saveBtn8 = document.createElement('button');
+  saveBtn8.innerText = '保存图像8';
+  saveBtn8.style.position = 'absolute';
+  saveBtn8.style.top = '190px';
+  saveBtn8.style.right = '10px';
+  document.body.appendChild(saveBtn8);
+  saveBtn8.onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'cnn_structure8.png';
+      link.href = canvas8.toDataURL();
+      link.click();
+    };
+</script>
+<script> // 第9个画布 YOLOv5和YOLOv8 Head对比
+  const canvas9 = document.getElementById('cnnCanvas9');
+  const ctx9 = canvas9.getContext('2d');
+
+  // 在画布上绘制YOLOv5和YOLOv8 Head的对比
+  // 模块
+  drawLabeledRoundedRectWithNumber(ctx9, 30, 120, 80, 30, "Conv2d", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 180, 60, 80, 30, "4", "", 'rgba(199, 255, 231, 0.4)', 4);
+  ctx9.fillStyle = '#000'; ctx9.font = '14px sans-serif';
+  ctx9.fillText('BBox CIoU', 265, 80);
+  drawLabeledRoundedRectWithNumber(ctx9, 180, 120, 80, 30, "1", "", 'rgba(199, 255, 231, 0.4)', 4);
+  ctx9.fillText('Obj BCE', 265, 140);
+  drawLabeledRoundedRectWithNumber(ctx9, 180, 180, 80, 30, "1", "", 'rgba(199, 255, 231, 0.4)', 4);
+  ctx9.fillText('Cls BCE', 265, 200);
+  // 箭头
+  drawConnectorWithArrow(ctx9, 10, 135, 30, 135, '#000', 2, false, "", "12px sans-serif", "bottom");
+
+  drawConnectorWithArrow(ctx9, 140, 75, 180, 75, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorWithArrow(ctx9, 110, 135, 180, 135, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorWithArrow(ctx9, 140, 195, 180, 195, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorReal(ctx9, 140, 75, 140, 195);
+
+  drawLabeledRoundedRectWithNumber(ctx9, 420 - 10, 90, 60, 30, "Conv", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 500 - 10, 90, 60, 30, "Conv", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 580 - 10, 90, 60, 30, "Conv2d", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 660 - 10, 90, 70, 30, "4xregmax", "", 'rgba(199, 255, 231, 0.4)', 4);
+  ctx9.fillText('CIoU', 730, 110);
+  ctx9.fillText('+DFL', 730, 130);
+
+  drawLabeledRoundedRectWithNumber(ctx9, 420 - 10, 150, 60, 30, "Conv", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 500 - 10, 150, 60, 30, "Conv", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 580 - 10, 150, 60, 30, "Conv2d", "", 'rgba(199, 255, 231, 0.4)', 4);
+  drawLabeledRoundedRectWithNumber(ctx9, 660 - 10, 150, 70, 30, "ncls", "", 'rgba(199, 255, 231, 0.4)', 4);
+  ctx9.fillText('BCE', 730, 170);
+
+
+  drawConnectorWithArrow(ctx9, 390 - 10, 105, 420 - 10, 105, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorWithArrow(ctx9, 390 - 10, 165, 420 - 10, 165, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorReal(ctx9, 390 - 10, 105, 390 - 10, 165);
+  drawConnectorWithArrow(ctx9, 350, 135, 390 - 10, 135, '#000', 2, false, "", "12px sans-serif", "bottom");
+
+  drawConnectorWithArrow(ctx9, 470, 105, 490, 105, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorWithArrow(ctx9, 470, 165, 490, 165, '#000', 2, false, "", "12px sans-serif", "bottom");
+
+  drawConnectorWithArrow(ctx9, 550, 105, 570, 105, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorWithArrow(ctx9, 550, 165, 570, 165, '#000', 2, false, "", "12px sans-serif", "bottom");
+
+  drawConnectorWithArrow(ctx9, 630, 105, 650, 105, '#000', 2, false, "", "12px sans-serif", "bottom");
+  drawConnectorWithArrow(ctx9, 630, 165, 650, 165, '#000', 2, false, "", "12px sans-serif", "bottom");
+  // 创建一个按钮保存画布9
+  const saveBtn9 = document.createElement('button');
+  saveBtn9.innerText = '保存图像9';
+  saveBtn9.style.position = 'absolute';
+  saveBtn9.style.top = '220px';
+  saveBtn9.style.right = '10px';
+  document.body.appendChild(saveBtn9);
+  saveBtn9.onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'cnn_structure9.png';
+      link.href = canvas9.toDataURL();
+      link.click();
+    };
+
+
+</script>
+
+
 </body>
 </html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Canvas 模块拖动示例</title>
+  <style>
+    body { margin: 0; padding: 0; }
+    canvas { border: 1px solid #ccc; display: block; margin: 0 auto; }
+    .panel {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .panel button { margin: 5px 0; display: block; width: 120px; }
+  </style>
+</head>
+<body>
+<div class="panel">
+  <button onclick="createRect('Conv2d')">添加 Conv2d</button>
+  <button onclick="createRect('BatchNorm2d')">添加 BN</button>
+  <button onclick="createRect('SiLU')">添加 SiLU</button>
+  <button onclick="createArrow('right')">箭头 →</button>
+  <button onclick="createArrow('left')">箭头 ←</button>
+  <button onclick="createArrow('up')">箭头 ↑</button>
+  <button onclick="createArrow('down')">箭头 ↓</button>
+</div>
+<canvas id="mainCanvas" width="1000" height="1000"></canvas>
+
+<script>
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+let elements = [];
+let dragTarget = null;
+let offsetX = 0, offsetY = 0;
+
+let arrows = [];
+let draggingArrow = null;
+let draggingPoint = null;
+let offset = {x: 0, y: 0};
+
+function createRect(label) {
+  elements.push({
+    x: 100 + Math.random() * 500,
+    y: 100 + Math.random() * 300,
+    w: 120,
+    h: 40,
+    label: label,
+    fill: 'rgba(173, 216, 230, 0.6)',
+    stroke: '#0077cc'
+  });
+  drawAll();
+}
+
+function createArrow(direction) {
+  const startX = 300, startY = 200;
+  let endX = startX, endY = startY;
+  if (direction === 'right') endX += 100;
+  if (direction === 'left')  endX -= 100;
+  if (direction === 'down')  endY += 100;
+  if (direction === 'up')    endY -= 100;
+
+  arrows.push({ fromX: startX, fromY: startY, toX: endX, toY: endY, label: direction.toUpperCase() });
+  drawAll();
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r, fill, stroke, text) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.stroke();
+  ctx.fillStyle = '#000';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x + w / 2, y + h / 2);
+}
+
+function drawAll() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const el of elements) {
+    drawRoundedRect(ctx, el.x, el.y, el.w, el.h, 6, el.fill, el.stroke, el.label);
+  }
+}
+
+function drawAllArrows() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const arrow of arrows) {
+    drawConnectorWithArrow(ctx, arrow.fromX, arrow.fromY, arrow.toX, arrow.toY, '#333', 2, false, arrow.label, '12px sans-serif', 'top');
+  }
+}
+
+function drawConnectorWithArrow(ctx, fromX, fromY, toX, toY, color = '#333', width = 2, dashed = false, label = '', font = '12px sans-serif', labelPosition = "right") {
+  const headlen = 10;
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = width;
+  if (dashed) ctx.setLineDash([5, 5]);
+
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+  ctx.lineTo(toX, toY);
+  ctx.closePath();
+  ctx.fill();
+
+  if (dashed) ctx.setLineDash([]);
+
+  if (label) {
+    const offset = 8;
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    let labelX = toX, labelY = toY;
+    if (labelPosition === 'right') {
+      ctx.textAlign = 'left';
+      labelX += offset;
+      labelY = (fromY + toY) / 2;
+    } else if (labelPosition === 'top') {
+      labelX = (fromX + toX) / 2;
+      labelY -= offset;
+    } else if (labelPosition === 'bottom') {
+      labelX = (fromX + toX) / 2;
+      labelY += offset;
+    }
+
+    ctx.fillText(label, labelX, labelY);
+  }
+
+  ctx.restore();
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) {
+      dragTarget = el;
+      offsetX = x - el.x;
+      offsetY = y - el.y;
+      break;
+    }
+  }
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  for (const arrow of arrows) {
+    if (Math.hypot(x - arrow.toX, y - arrow.toY) < 10) {
+      draggingArrow = arrow;
+      draggingPoint = 'to';
+      offset.x = x - arrow.toX;
+      offset.y = y - arrow.toY;
+      return;
+    } else if (Math.hypot(x - arrow.fromX, y - arrow.fromY) < 10) {
+      draggingArrow = arrow;
+      draggingPoint = 'from';
+      offset.x = x - arrow.fromX;
+      offset.y = y - arrow.fromY;
+      return;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!draggingArrow) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (draggingPoint === 'to') {
+    draggingArrow.toX = x - offset.x;
+    draggingArrow.toY = y - offset.y;
+  } else if (draggingPoint === 'from') {
+    draggingArrow.fromX = x - offset.x;
+    draggingArrow.fromY = y - offset.y;
+  }
+  drawAllArrows();
+});
+
+canvas.addEventListener('mouseup', () => {
+  draggingArrow = null;
+  draggingPoint = null;
+});
+
+canvas.addEventListener('dblclick', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  for (const arrow of arrows) {
+    const midX = (arrow.fromX + arrow.toX) / 2;
+    const midY = (arrow.fromY + arrow.toY) / 2;
+    if (Math.hypot(x - midX, y - midY) < 20) {
+      const newLabel = prompt("修改箭头文字:", arrow.label);
+      if (newLabel !== null) arrow.label = newLabel;
+      drawAll();
+      break;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragTarget) return;
+  const rect = canvas.getBoundingClientRect();
+  dragTarget.x = e.clientX - rect.left - offsetX;
+  dragTarget.y = e.clientY - rect.top - offsetY;
+  drawAll();
+});
+
+canvas.addEventListener('mouseup', () => {
+  dragTarget = null;
+});
+</script>
+</body>
+</html>
