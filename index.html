@@ -11,10 +11,9 @@
 <body>
 <canvas id="cnnCanvas" width="780" height="240"></canvas>
 <canvas id="cnnCanvas2" width="780" height="240"></canvas>
-<script>
-  const canvas = document.getElementById('cnnCanvas');
-  const ctx = canvas.getContext('2d');
-
+<canvas id="cnnCanvas3" width="780" height="240"></canvas>
+<canvas id="cnnCanvas4" width="780" height="240"></canvas>
+<script> // 全局变量和可调用API
   // 样式参数
   const fm1Color = 'rgba(0,100,255,0.2)';
   const convStroke = '#0060ff';
@@ -23,8 +22,23 @@
   const dashColor = '#333';
   const dashColor2 = '#ff0';
 
+  // 绘制连线
+  function drawConnector(ctx, fromX, fromY, toX, toY) {
+    ctx.save();
+    ctx.strokeStyle = dashColor;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = dashColor;
+    ctx.fill();
+    ctx.restore();
+  }
+
   // 绘制多层叠加的方块函数
-  function drawLayer(x, y, w, h, count, offset, fill, stroke, AlpghaRate) {
+  function drawLayer(ctx, x, y, w, h, count, offset, fill, stroke, AlpghaRate) {
     for (let i = 0; i < count; i++) {
       // 保存当前状态
       ctx.save();
@@ -43,67 +57,146 @@
     }
   }
 
-  // 绘制连线
-  function drawConnector(fromX, fromY, toX, toY) {
+  /**
+   * 在 canvas 上绘制一个正方形网格并居中填入二维数组，可高亮部分格子
+   * @param {number[][]} data 二维数组
+   * @param {number} gridX 左上角 x 坐标
+   * @param {number} gridY 左上角 y 坐标
+   * @param {number} cellSize 每个格子边长
+   * @param {Array<[number, number]>} highlightCells 高亮格子的坐标列表（如 [[0,1], [2,2]]）
+   * @param {string} color 高亮颜色, 默认为 'rgba(255, 255, 0, 0.4)'
+   */
+  function drawCenteredGridWithData(ctx, data, gridX, gridY, cellSize, highlightCells = [], color = 'rgba(255, 255, 0, 0.4)') {
+    const rows = data.length;
+    const cols = data[0].length;
+    const totalSize = Math.max(rows, cols) * cellSize;
+
+    const offsetX = (totalSize - cols * cellSize) / 2;
+    const offsetY = (totalSize - rows * cellSize) / 2;
+
+    ctx.font = `${cellSize * 0.4}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const x = gridX + offsetX + j * cellSize;
+        const y = gridY + offsetY + i * cellSize;
+
+        // 检查是否为高亮格子
+        const isHighlighted = highlightCells.some(([hi, hj]) => hi === i && hj === j);
+        if (isHighlighted) {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, cellSize, cellSize);
+        }
+
+        // 绘制边框和文字
+        ctx.strokeStyle = isHighlighted ? '#ff9900' : '#000'; // 高亮边框为橙色
+        ctx.strokeRect(x, y, cellSize, cellSize);
+        ctx.fillStyle = '#000';
+        ctx.fillText(data[i][j], x + cellSize / 2, y + cellSize / 2);
+      }
+    }
+  }
+
+  // 绘制带箭头的连线
+  /**
+   * 绘制带箭头的连接线
+   * @param {number} fromX 起点 x 坐标
+   * @param {number} fromY 起点 y 坐标
+   * @param {number} toX   终点 x 坐标
+   * @param {number} toY   终点 y 坐标
+   * @param {string} color 线条颜色
+   * @param {number} width 线宽
+   * @param {boolean} dashed 是否为虚线
+   */
+  function drawConnectorWithArrow(ctx, fromX, fromY, toX, toY, color = '#333', width = 2, dashed = false) {
+    const headlen = 10; // 箭头长度
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+
     ctx.save();
-    ctx.strokeStyle = dashColor;
-    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = width;
+
+    if (dashed) ctx.setLineDash([5, 5]);
+
+    // 主线
     ctx.beginPath();
     ctx.moveTo(fromX, fromY);
     ctx.lineTo(toX, toY);
     ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = dashColor;
+
+    // 箭头
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(
+      toX - headlen * Math.cos(angle - Math.PI / 6),
+      toY - headlen * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      toX - headlen * Math.cos(angle + Math.PI / 6),
+      toY - headlen * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.lineTo(toX, toY);
+    ctx.closePath();
     ctx.fill();
-    ctx.restore;
+
+    if (dashed) ctx.setLineDash([]); // 清除虚线样式
+    ctx.restore();
   }
-  
+
+</script>
+<script>
+  const canvas = document.getElementById('cnnCanvas');
+  const ctx1 = canvas.getContext('2d');
+
   // 输入层
   const inputMap = { x: 20, y: 90, w: 50, h: 50, count: 3, off: 10 };
-  drawLayer(inputMap.x, inputMap.y, inputMap.w, inputMap.h, inputMap.count, inputMap.off, fm1Color, convStroke, 3);
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('输入层', inputMap.x, inputMap.y - 10);
+  drawLayer(ctx1, inputMap.x, inputMap.y, inputMap.w, inputMap.h, inputMap.count, inputMap.off, fm1Color, convStroke, 3);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('输入层', inputMap.x, inputMap.y - 10);
 
   // 输入层选中区域
   const selInput = { x: inputMap.x + 4 * inputMap.off, y: inputMap.y + 4 * inputMap.off, w: 12, h: 12 };
-  ctx.strokeStyle = dashColor2; ctx.setLineDash([3, 3]);
-  ctx.strokeRect(selInput.x, selInput.y, selInput.w, selInput.h);
-  ctx.setLineDash([]);
+  ctx1.strokeStyle = dashColor2; ctx1.setLineDash([3, 3]);
+  ctx1.strokeRect(selInput.x, selInput.y, selInput.w, selInput.h);
+  ctx1.setLineDash([]);
 
   // 特征图 1
   const fm1 = { x: 120, y: 50, w: 100, h: 100, count: 5, off: 10 };
-  drawLayer(fm1.x, fm1.y, fm1.w, fm1.h, fm1.count, fm1.off, fm1Color, convStroke, 3);
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('特征图 1', fm1.x, fm1.y - 10);
+  drawLayer(ctx1, fm1.x, fm1.y, fm1.w, fm1.h, fm1.count, fm1.off, fm1Color, convStroke, 3);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('特征图 1', fm1.x, fm1.y - 10);
 
   // 输入层到特征图1的连线
   const fromX1Input = selInput.x + selInput.w;
   const fromY1Input = selInput.y;
   const fromX2Input = selInput.x + selInput.w;
   const fromY2Input = selInput.y + selInput.h;
-  drawConnector(fromX1Input, fromY1Input, fm1.x + 9 * fm1.off, fm1.y + 9 * fm1.off);
-  drawConnector(fromX2Input, fromY2Input, fm1.x + 9 * fm1.off, fm1.y + 9 * fm1.off);
+  drawConnector(ctx1, fromX1Input, fromY1Input, fm1.x + 9 * fm1.off, fm1.y + 9 * fm1.off);
+  drawConnector(ctx1, fromX2Input, fromY2Input, fm1.x + 9 * fm1.off, fm1.y + 9 * fm1.off);
   // 在连线下方添加文字
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('卷积', (fromX1Input + fm1.x + 1 * fm1.off) / 2 - 10, (fromY1Input + fm1.y) - 10);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('卷积', (fromX1Input + fm1.x + 1 * fm1.off) / 2 - 10, (fromY1Input + fm1.y) - 10);
 
   // 特征图 1 选中区域（虚线框）
   const sel1 = { x: fm1.x + 7 * fm1.off, y: fm1.y + 7 * fm1.off, w: 25, h: 25};
-  ctx.strokeStyle = dashColor2; ctx.setLineDash([3, 3]);
-  ctx.strokeRect(sel1.x, sel1.y, sel1.w, sel1.h);
-  ctx.setLineDash([]);
+  ctx1.strokeStyle = dashColor2; ctx1.setLineDash([3, 3]);
+  ctx1.strokeRect(sel1.x, sel1.y, sel1.w, sel1.h);
+  ctx1.setLineDash([]);
 
   // 特征图 2
   const fm2 = { x: 290, y: 70, w: 60, h: 60, count: 5, off: 8 };
-  drawLayer(fm2.x, fm2.y, fm2.w, fm2.h, fm2.count, fm2.off, fm2Color, poolStroke, 3);
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('特征图 2', fm2.x, fm2.y - 10);
+  drawLayer(ctx1, fm2.x, fm2.y, fm2.w, fm2.h, fm2.count, fm2.off, fm2Color, poolStroke, 3);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('特征图 2', fm2.x, fm2.y - 10);
 
   // 特征图 2 选中区域
   const sel2 = { x: fm2.x + 7 * fm2.off, y: fm2.y + 5 * fm2.off, w: 15, h: 15 };
-  ctx.strokeStyle = dashColor2; ctx.setLineDash([3, 3]);
-  ctx.strokeRect(sel2.x, sel2.y, sel2.w, sel2.h);
-  ctx.setLineDash([]);
+  ctx1.strokeStyle = dashColor2; ctx1.setLineDash([3, 3]);
+  ctx1.strokeRect(sel2.x, sel2.y, sel2.w, sel2.h);
+  ctx1.setLineDash([]);
 
   // 从特征图1选中到特征图2的连线,双线汇于一点，起点为右上角和右下角
   const fromX1Sel1 = sel1.x + sel1.w;
@@ -112,40 +205,40 @@
   const fromY2Sel1 = sel1.y + sel1.h;
   const toX = fm2.x + 8 * fm2.off;
   const toY = fm2.y + 6 * fm2.off;
-  drawConnector(fromX1Sel1, fromY1Sel1, toX, toY);
-  drawConnector(fromX2Sel1, fromY2Sel1, toX, toY);
+  drawConnector(ctx1, fromX1Sel1, fromY1Sel1, toX, toY);
+  drawConnector(ctx1, fromX2Sel1, fromY2Sel1, toX, toY);
   // 在连线下方添加文字
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('池化', (fromX1Sel1 + fm2.x + 3 * fm2.off) / 2, (fromY1Sel1 + fm2.y) - 30);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('池化', (fromX1Sel1 + fm2.x + 3 * fm2.off) / 2, (fromY1Sel1 + fm2.y) - 30);
 
   // 特征图 3
   const fm3 = { x: 390, y: 50, w: 70, h: 70, count: 12, off: 8 };
-  drawLayer(fm3.x, fm3.y, fm3.w, fm3.h, fm3.count, fm3.off, fm1Color, convStroke, 9);
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('特征图 3', fm3.x, fm3.y - 10);
+  drawLayer(ctx1, fm3.x, fm3.y, fm3.w, fm3.h, fm3.count, fm3.off, fm1Color, convStroke, 9);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('特征图 3', fm3.x, fm3.y - 10);
 
   // 特征图 3 选中区域
   const sel3 = { x: fm3.x + 15 * fm3.off, y: fm3.y + 14 * fm3.off, w: 15, h: 15 };
-  ctx.strokeStyle = dashColor2; ctx.setLineDash([3, 3]);
-  ctx.strokeRect(sel3.x, sel3.y, sel3.w, sel3.h);
-  ctx.setLineDash([]);
+  ctx1.strokeStyle = dashColor2; ctx1.setLineDash([3, 3]);
+  ctx1.strokeRect(sel3.x, sel3.y, sel3.w, sel3.h);
+  ctx1.setLineDash([]);
 
   // 从特征图2选中到特征图3的连线,双线汇于一点，起点为右上角和右下角
   const fromX1Sel2 = sel2.x + sel2.w;
   const fromY1Sel2 = sel2.y;
   const fromX2Sel2 = sel2.x + sel2.w;
   const fromY2Sel2 = sel2.y + sel2.h;
-  drawConnector(fromX1Sel2, fromY1Sel2, fm3.x + 16 * fm3.off, fm3.y + 15 * fm3.off);
-  drawConnector(fromX2Sel2, fromY2Sel2, fm3.x + 16 * fm3.off, fm3.y + 15 * fm3.off);
+  drawConnector(ctx1, fromX1Sel2, fromY1Sel2, fm3.x + 16 * fm3.off, fm3.y + 15 * fm3.off);
+  drawConnector(ctx1, fromX2Sel2, fromY2Sel2, fm3.x + 16 * fm3.off, fm3.y + 15 * fm3.off);
   // 在连线下方添加文字
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('卷积', (fromX1Sel2 + fm3.x + 4 * fm3.off) / 2, (fromY1Sel2 + fm3.y));
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('卷积', (fromX1Sel2 + fm3.x + 4 * fm3.off) / 2, (fromY1Sel2 + fm3.y));
 
   // 特征图 4
   const fm4 = { x: 525, y: 70, w: 40, h: 40, count: 12, off: 8 };
-  drawLayer(fm4.x, fm4.y, fm4.w, fm4.h, fm4.count, fm4.off, fm2Color, poolStroke, 9);
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('特征图 4', fm4.x, fm4.y - 10);
+  drawLayer(ctx1, fm4.x, fm4.y, fm4.w, fm4.h, fm4.count, fm4.off, fm2Color, poolStroke, 9);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('特征图 4', fm4.x, fm4.y - 10);
 
   // 特征图3选中区域到特征图4选中区域的连线
   const fromX1Sel3 = sel3.x + sel3.w;
@@ -154,23 +247,23 @@
   const fromY2Sel3 = sel3.y + sel3.h;
   const toX2 = fm4.x + 13 * fm4.off;
   const toY2 = fm4.y + 13 * fm4.off;
-  drawConnector(fromX1Sel3, fromY1Sel3, toX2, toY2);
-  drawConnector(fromX2Sel3, fromY2Sel3, toX2, toY2);
+  drawConnector(ctx1, fromX1Sel3, fromY1Sel3, toX2, toY2);
+  drawConnector(ctx1, fromX2Sel3, fromY2Sel3, toX2, toY2);
   // 在连线下方添加文字
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('池化', (fromX1Sel3 + fm4.x + 7 * fm4.off) / 2, (fromY1Sel3 + fm4.y) - 35);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('池化', (fromX1Sel3 + fm4.x + 7 * fm4.off) / 2, (fromY1Sel3 + fm4.y) - 35);
 
   // 全连接层
   const fc = { x: 620, y: 90, count: 10, space: 10, r: 8 };
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('全连接层', fc.x, fc.y - 20);
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('全连接层', fc.x, fc.y - 20);
   for (let i = 0; i < fc.count; i++) {
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(128,222,233,0.8)';
-    ctx.strokeStyle = 'purple';
-    ctx.lineWidth = 1;
-    ctx.arc(fc.x + i * fc.space, fc.y + i * fc.space, fc.r, 0, 2 * Math.PI);
-    ctx.fill(); ctx.stroke();
+    ctx1.beginPath();
+    ctx1.fillStyle = 'rgba(128,222,233,0.8)';
+    ctx1.strokeStyle = 'purple';
+    ctx1.lineWidth = 1;
+    ctx1.arc(fc.x + i * fc.space, fc.y + i * fc.space, fc.r, 0, 2 * Math.PI);
+    ctx1.fill(); ctx1.stroke();
   }
 
   // 特征图 3 到全连接层的连线
@@ -178,27 +271,27 @@
   const fromY1Fm4 = fm4.y;
   const fromX2Fm4 = fm4.x + fm4.w + (fm4.count - 1) * fm4.off;
   const fromY2Fm4 = fm4.y + fm4.h + (fm4.count - 1) * fm4.off;
-  drawConnector(fromX1Fm4, fromY1Fm4, fc.x, fc.y);
-  drawConnector(fromX2Fm4, fromY2Fm4, fc.x + (fc.count - 1) * fc.space, fc.y + (fc.count - 1) * fc.space);
+  drawConnector(ctx1, fromX1Fm4, fromY1Fm4, fc.x, fc.y);
+  drawConnector(ctx1, fromX2Fm4, fromY2Fm4, fc.x + (fc.count - 1) * fc.space, fc.y + (fc.count - 1) * fc.space);
 
   // 输出层
   const outX = fc.x + (fc.count - 1) * fc.space + 10;
   const outY = fc.y + (fc.count / 2) * fc.space;
-  ctx.fillStyle = '#222'; ctx.font = '14px sans-serif';
-  ctx.fillText('输出层', outX, outY - 20);
-  ctx.beginPath();
+  ctx1.fillStyle = '#222'; ctx1.font = '14px sans-serif';
+  ctx1.fillText('输出层', outX, outY - 20);
+  ctx1.beginPath();
   // 浅蓝色
-  ctx.fillStyle = 'rgba(128,222,233,0.8)'; ctx.strokeStyle = 'purple';
-  ctx.arc(outX + 20, outY, fc.r, 0, 2 * Math.PI);
-  ctx.fill(); ctx.stroke();
+  ctx1.fillStyle = 'rgba(128,222,233,0.8)'; ctx1.strokeStyle = 'purple';
+  ctx1.arc(outX + 20, outY, fc.r, 0, 2 * Math.PI);
+  ctx1.fill(); ctx1.stroke();
 
   // 连接到输出层
   const fromX1Fc = fc.x;
   const fromY1Fc = fc.y;
   const fromX2Fc = fc.x + (fc.count - 1) * fc.space;
   const fromY2Fc = fc.y + (fc.count - 1) * fc.space;
-  drawConnector(fromX1Fc, fromY1Fc, outX + 20, outY);
-  drawConnector(fromX2Fc, fromY2Fc, outX + 20, outY);
+  drawConnector(ctx1, fromX1Fc, fromY1Fc, outX + 20, outY);
+  drawConnector(ctx1, fromX2Fc, fromY2Fc, outX + 20, outY);
 
   // 创建按钮保存以上绘制的图像
   const saveBtn = document.createElement('button');
@@ -213,28 +306,11 @@
     link.click();
   };
   document.body.appendChild(saveBtn);
-
-  
 </script>
 <script>
   // 第二个画布
   const canvas2 = document.getElementById('cnnCanvas2');
   const ctx2 = canvas2.getContext('2d');
-
-  // 绘制连线
-  function drawConnector(fromX, fromY, toX, toY) {
-    ctx2.save();
-    ctx2.strokeStyle = dashColor;
-    ctx2.setLineDash([5, 5]);
-    ctx2.beginPath();
-    ctx2.moveTo(fromX, fromY);
-    ctx2.lineTo(toX, toY);
-    ctx2.stroke();
-    ctx2.setLineDash([]);
-    ctx2.fillStyle = dashColor;
-    ctx2.fill();
-    ctx2.restore;
-  }
 
   // 创建全连接层的上面两个圆圈
   const c2fcP1 = { x: 50, y: 50, count: 2, space: 35, r: 12 };
@@ -283,7 +359,221 @@
     ctx2.fillText('x' + (i + 3), c2fcP2.x - 6, c2fcP2.y + i * c2fcP2.space + 5);
   }
 
+</script>
+<script>
+  // 第三个画布
+  const canvas3 = document.getElementById('cnnCanvas3');
+  const ctx3 = canvas3.getContext('2d');
 
+  // 原始图像数据
+  const data = [
+    [1, 2, 3, 0, 1],
+    [0, 1, 2, 3, 1],
+    [1, 0, 1, 2, 2],
+    [2, 1, 0, 1, 0],
+    [1, 3, 1, 0, 2]
+  ];
+
+  // 高亮第一感受野区域（左上角 3x3）
+  const highlightCells = [
+    [0, 0], [0, 1], [0, 2],
+    [1, 0], [1, 1], [1, 2],
+    [2, 0], [2, 1], [2, 2]
+  ];
+
+// 原图网格
+const gridX = 20, gridY = 60, cellSize = 30;
+drawCenteredGridWithData(ctx3, data, gridX, gridY, cellSize, highlightCells);
+
+// 标题
+ctx3.fillStyle = '#222'; ctx3.font = '14px sans-serif';
+ctx3.fillText('Input Image (5x5)', gridX + cellSize * 2.5, gridY - 10);
+
+// 全1卷积核
+const kernel = [
+  [1, 1, 1],
+  [1, 1, 1],
+  [1, 1, 1]
+];
+
+// 绘制图像
+drawCenteredGridWithData(ctx3, kernel, 240, 90, 30);
+ctx3.fillStyle = '#222'; ctx3.font = '14px sans-serif';
+ctx3.fillText('Convolution Kernel (3x3)', 240 + 45, 60);
+
+// 绘制高亮区域四个角点到卷积核四个角点的连线
+// 起点在原图像上的坐标
+const kernelCorners = [
+  [0, 0], [0, 3],
+  [3, 0], [3, 3]
+];
+// 终点在卷积核上的坐标
+const kernelCornersInKernel = [
+  [0, 0], [0, 3],
+  [3, 0], [3, 3]
+];
+// 根据坐标生成起点和终点的实际像素坐标
+const kernelHighlightCells = [];
+for (let i = 0; i < kernelCorners.length; i++) {
+  const [x1, y1] = kernelCorners[i];
+  const [x2, y2] = kernelCornersInKernel[i];
+  const startX = gridX + x1 * cellSize;
+  const startY = gridY + y1 * cellSize;
+  const endX = 240 + x2 * cellSize;
+  const endY = 90 + y2 * cellSize;
+  kernelHighlightCells.push([startX, startY, endX, endY]);
+}
+// 绘制连线
+for (let i = 0; i < kernelHighlightCells.length; i++) {
+  const [x1, y1, x2, y2] = kernelHighlightCells[i];
+  ctx3.strokeStyle = '#ff9900'; // 橙色
+  ctx3.setLineDash([5, 5]);
+  ctx3.beginPath();
+  ctx3.moveTo(x1, y1);
+  ctx3.lineTo(x2, y2);
+  ctx3.stroke();
+}
+
+for (let i = 0; i < kernelHighlightCells.length; i++) {
+  const [x1, y1, x2, y2] = kernelHighlightCells[i];
+  ctx3.strokeStyle = '#ff9900'; // 橙色
+  ctx3.setLineDash([5, 5]);
+  ctx3.beginPath();
+  ctx3.moveTo(x1, y1);
+  ctx3.lineTo(x2, y2);
+  ctx3.stroke();
+}
+ctx3.setLineDash([]);
+
+// 输出图像：3x3（假设卷积核为全 1，仅作演示）
+const output = [
+  [12, 14, 13],
+  [9,  9,  9],
+  [11, 8,  9]
+];
+
+drawCenteredGridWithData(ctx3, output, 440, 90, 30);
+ctx3.fillStyle = '#222'; ctx3.font = '14px sans-serif';
+ctx3.fillText('Output Feature Map (3x3)', 440 + 45, 60);
+
+  // 绘制箭头
+const arrowStartX = 240 + 4 * cellSize;
+const arrowStartY = 90 + 1.5 * cellSize;
+const arrowEndX = 440 - cellSize;
+const arrowEndY = 90 + 1.5 * cellSize;
+
+drawConnectorWithArrow(ctx3, arrowStartX, arrowStartY, arrowEndX, arrowEndY);
+// 创建一个保存画布3的按钮
+const saveBtn3 = document.createElement('button');
+saveBtn3.innerText = '保存图像3';
+saveBtn3.style.position = 'absolute';
+saveBtn3.style.top = '60px';
+saveBtn3.style.right = '10px';
+document.body.appendChild(saveBtn3);
+saveBtn3.onclick = function() {
+    const link = document.createElement('a');
+    link.download = 'cnn_structure3.png';
+    link.href = canvas3.toDataURL();
+    link.click();
+  };
+</script>
+<script>
+  // 第四个画布
+  const canvas4 = document.getElementById('cnnCanvas4');
+  const ctx4 = canvas4.getContext('2d');
+
+  // 4x4的输入图像网格
+  const input4x4 = [
+    [1, 2, 3, 0],
+    [0, 1, 2, 3],
+    [1, 0, 1, 2],
+    [2, 1, 0, 1]
+  ];
+
+  // 池化输入图像分四组高亮区域,每个区域一种颜色
+  const highlightCellsOnPooling = [
+    [[0, 0], [0, 1], [1, 0], [1, 1]],  // 第一组
+    [[0, 2], [0, 3], [1, 2], [1, 3]],  // 第二组
+    [[2, 0], [2, 1], [3, 0], [3, 1]],  // 第三组
+    [[2, 2], [2, 3], [3, 2], [3, 3]]   // 第四组
+  ];
+  // 四种颜色
+  const highlightColors = [
+    'rgba(255, 0, 0, 0.4)',   // 红色
+    'rgba(0, 255, 0, 0.4)',   // 绿色
+    'rgba(255, 255, 0, 0.4)',  // 黄色
+    'rgba(0, 0, 255, 0.4)',   // 蓝色
+  ];
+  // drawCenteredGridWithData(ctx4, input4x4, 20, 60, 30);
+  // 根据四组高亮分四步完成网格的绘制,每次绘制一个2x2的网格
+  for (let i = 0; i < highlightCellsOnPooling.length; i++) {
+    const group = highlightCellsOnPooling[i];
+    const color = highlightColors[i];
+    drawCenteredGridWithData(ctx4, input4x4, gridX, gridY, cellSize, group, color);
+  }
+  ctx4.fillStyle = '#222'; ctx4.font = '14px sans-serif';
+  ctx4.fillText('Input Image (4x4)', 20 + 30 * 2, 60 - 10);
+
+  // 计算 2x2 池化结果（步长=2）
+  function maxPool2x2(input) {
+    const out = [];
+    for (let i = 0; i < 4; i += 2) {
+      const row = [];
+      for (let j = 0; j < 4; j += 2) {
+        row.push(Math.max(
+          input[i][j], input[i][j + 1],
+          input[i + 1][j], input[i + 1][j + 1]
+        ));
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  function avgPool2x2(input) {
+    const out = [];
+    for (let i = 0; i < 4; i += 2) {
+      const row = [];
+      for (let j = 0; j < 4; j += 2) {
+        const sum = input[i][j] + input[i][j + 1] + input[i + 1][j] + input[i + 1][j + 1];
+        row.push((sum / 4).toFixed(1)); // 保留一位小数
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  // 获取池化结果
+  const maxPooled = maxPool2x2(input4x4);
+  const avgPooled = avgPool2x2(input4x4);
+
+  // 绘制最大池化结果
+  drawCenteredGridWithData(ctx4, maxPooled, 240, 40, 30);
+  ctx4.fillStyle = '#222'; ctx4.font = '14px sans-serif';
+  ctx4.fillText('Max Pooling (2x2)', 240 + 30, 30);
+
+  // 绘制平均池化结果
+  drawCenteredGridWithData(ctx4, avgPooled, 240, 140, 30);
+  ctx4.fillStyle = '#222'; ctx4.font = '14px sans-serif';
+  ctx4.fillText('Avg Pooling (2x2)', 240 + 30, 130);
+
+  // 连线：输入 → 最大池化
+  drawConnectorWithArrow(ctx4, 20 + 30 * 4.5, 40 + 30 * 1, 240 - 30 * 0.5, 40 + 30, '#0060ff', 2, false);
+  // 连线：输入 → 平均池化
+  drawConnectorWithArrow(ctx4, 20 + 30 * 4.5, 140 + 30 * 1, 240 - 30 * 0.5, 140 + 30 * 1, '#00aa00', 2, false);
+  // 创建一个保存画布4的按钮
+  const saveBtn4 = document.createElement('button');
+  saveBtn4.innerText = '保存图像4';
+  saveBtn4.style.position = 'absolute';
+  saveBtn4.style.top = '90px';
+  saveBtn4.style.right = '10px';
+  document.body.appendChild(saveBtn4);
+  saveBtn4.onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'cnn_structure4.png';
+      link.href = canvas4.toDataURL();
+      link.click();
+    };
 </script>
 </body>
 </html>
